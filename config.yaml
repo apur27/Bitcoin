@@ -1,0 +1,206 @@
+# Bitcoin Forecaster Configuration File
+# =========================================
+
+# API Configuration
+api:
+  # TwelveData API for price data (required)
+  twelvedata_key: "your_twelvedata_api_key"
+  
+  # FRED API for macroeconomic data (optional but recommended)
+  fred_key: "your_fred_api_key"
+  
+  # Rate limiting (requests per minute)
+  rate_limit: 60
+
+# Data Configuration
+data:
+  # Historical data range
+  days: 2000
+  
+  # Data sources to include
+  sources:
+    price_data: true
+    volume_data: true
+    sentiment_data: true
+    macro_data: true
+    onchain_data: true
+    
+  # External data refresh intervals (hours)
+  refresh_intervals:
+    sentiment: 1
+    macro: 24
+    onchain: 6
+
+# Model Configuration
+models:
+  # Training parameters
+  test_size: 0.1
+  lookback_days: 30
+  
+  # Cross-validation
+  cv_splits: 3
+  
+  # XGBoost parameters
+  xgboost:
+    n_estimators: 500
+    max_depth: 6
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    random_state: 42
+    
+  # LSTM parameters
+  lstm:
+    units1: 128
+    units2: 64
+    units3: 32
+    dropout1: 0.2
+    dropout2: 0.2
+    epochs: 100
+    batch_size: 64
+    patience: 15
+    
+  # Prophet parameters
+  prophet:
+    changepoint_prior_scale: 0.05
+    seasonality_prior_scale: 10
+    holidays_prior_scale: 10
+    seasonality_mode: 'additive'
+    
+  # CatBoost parameters
+  catboost:
+    iterations: 500
+    depth: 6
+    learning_rate: 0.1
+    l2_leaf_reg: 3
+    
+  # Ensemble weights
+  ensemble_weights:
+    xgboost: 0.30
+    lstm: 0.25
+    prophet: 0.25
+    catboost: 0.20
+
+# Feature Engineering
+features:
+  # Technical indicators
+  technical:
+    sma_periods: [7, 25, 50, 200]
+    ema_periods: [12, 26]
+    rsi_period: 14
+    macd_fast: 12
+    macd_slow: 26
+    macd_signal: 9
+    bollinger_period: 20
+    bollinger_std: 2
+    atr_period: 14
+    
+  # Feature selection
+  selection:
+    method: "rfecv"  # or "correlation", "mutual_info"
+    max_features: 30
+    correlation_threshold: 0.95
+    
+  # Regime detection
+  regime:
+    window: 90
+    volatility_threshold: 1.5
+    trend_threshold: 0.02
+
+# Prediction Configuration
+prediction:
+  # Default prediction horizon
+  days_ahead: 30
+  
+  # Confidence intervals
+  quantiles: [0.1, 0.5, 0.9]
+  
+  # Stability testing
+  stability_runs: 5
+  stability_noise: 0.001
+
+# Backtesting Configuration
+backtesting:
+  # Backtesting period
+  start_date: "2020-01-01"
+  end_date: null  # null for latest available
+  
+  # Walk-forward analysis
+  window_size: 365  # days
+  step_size: 30     # days
+  
+  # Trading simulation
+  initial_capital: 10000
+  transaction_cost: 0.001  # 0.1%
+  slippage: 0.0005         # 0.05%
+
+# Risk Management
+risk:
+  # Position sizing
+  max_position_size: 0.1  # 10% of portfolio
+  kelly_criterion: true
+  
+  # Risk metrics
+  var_confidence: 0.05    # 5% VaR
+  max_drawdown: 0.2       # 20% max drawdown
+  
+  # Stop loss and take profit
+  stop_loss: 0.05         # 5% stop loss
+  take_profit: 0.15       # 15% take profit
+
+# Logging and Output
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "bitcoin_forecast.log"
+  console: true
+  
+# Output configuration
+output:
+  # File formats
+  save_predictions: true
+  save_models: true
+  save_plots: true
+  
+  # Directories
+  model_dir: "models"
+  output_dir: "outputs"
+  plot_dir: "plots"
+  
+  # Plot settings
+  plot_format: "png"  # png, jpg, svg, pdf
+  plot_dpi: 300
+  plot_style: "seaborn"
+
+# Notifications (optional)
+notifications:
+  enabled: false
+  
+  # Email notifications
+  email:
+    smtp_server: "smtp.gmail.com"
+    smtp_port: 587
+    username: "your_email@gmail.com"
+    password: "your_app_password"
+    to_email: "recipient@gmail.com"
+    
+  # Telegram notifications
+  telegram:
+    bot_token: "your_telegram_bot_token"
+    chat_id: "your_chat_id"
+
+# Advanced Settings
+advanced:
+  # GPU settings
+  use_gpu: true
+  gpu_memory_growth: true
+  
+  # Multiprocessing
+  n_jobs: -1  # -1 for all cores
+  
+  # Random seeds for reproducibility
+  random_state: 42
+  
+  # Optimization
+  hyperparameter_optimization: true
+  optimization_trials: 100
+  optimization_timeout: 3600  # seconds
