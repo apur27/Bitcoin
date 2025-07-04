@@ -502,7 +502,7 @@ class UltimateBitcoinForecaster:
             if len(X.columns) <= n_features:
                 return X.columns.tolist()
             
-            model = xgb.XGBRegressor(random_state=random_state)
+            model = xgb.XGBRegressor(random_state=random_state, tree_method='hist', n_jobs=-1)
             tscv = TimeSeriesSplit(n_splits=3)
             rfecv = RFECV(estimator=model, step=0.1, cv=tscv, scoring='neg_mean_squared_error')
             rfecv.fit(X, y)
@@ -598,7 +598,9 @@ class UltimateBitcoinForecaster:
                 'learning_rate': trial.suggest_float('learning_rate', 0.001, 0.1, log=True),
                 'n_estimators': trial.suggest_int('n_estimators', 50, 500),
                 'subsample': trial.suggest_float('subsample', 0.5, 1.0),
-                'random_state': random_state
+                'random_state': random_state,
+                'tree_method': 'hist',
+                'n_jobs': -1
             }
             model = xgb.XGBRegressor(**params)
             model.fit(X_train, y_train)
@@ -614,17 +616,19 @@ class UltimateBitcoinForecaster:
         return study.best_params
 
     def optimize_lstm(self, X_train, y_train, X_val, y_val, lookback):
-        """Optimize LSTM hyperparameters."""
+        """Optimize LSTM hyperparameters with a single pre-computed dataset to speed up each Optuna trial."""
+
+        # Pre-compute the sliding windows once instead of inside every trial
+        X_lstm_train, y_lstm_train = self.prepare_lstm_data(X_train, y_train, lookback)
+        X_lstm_val, y_lstm_val = self.prepare_lstm_data(X_val, y_val, lookback)
+
         def objective(trial):
             units1 = trial.suggest_int('units1', 64, 256)
             units2 = trial.suggest_int('units2', 32, 128)
             units3 = trial.suggest_int('units3', 16, 64)
             dropout1 = trial.suggest_float('dropout1', 0.1, 0.5)
             dropout2 = trial.suggest_float('dropout2', 0.1, 0.5)
-            
-            X_lstm_train, y_lstm_train = self.prepare_lstm_data(X_train, y_train, lookback)
-            X_lstm_val, y_lstm_val = self.prepare_lstm_data(X_val, y_val, lookback)
-            
+
             inputs = Input(shape=(lookback, X_train.shape[1]))
             lstm1 = Bidirectional(LSTM(units1, return_sequences=True))(inputs)
             dropout_layer1 = Dropout(dropout1)(lstm1)
@@ -633,20 +637,27 @@ class UltimateBitcoinForecaster:
             dropout_layer2 = Dropout(dropout2)(attention_output)
             lstm3 = LSTM(units3)(dropout_layer2)
             outputs = Dense(1, activation='linear')(lstm3)
-            
+
             model = Model(inputs=inputs, outputs=outputs)
             model.compile(optimizer='nadam', loss='mse')
-            
+
             early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
-            model.fit(X_lstm_train, y_lstm_train, epochs=50, batch_size=64, 
-                      validation_data=(X_lstm_val, y_lstm_val), callbacks=[early_stopping], verbose=0)
-            
+            model.fit(
+                X_lstm_train,
+                y_lstm_train,
+                epochs=50,
+                batch_size=64,
+                validation_data=(X_lstm_val, y_lstm_val),
+                callbacks=[early_stopping],
+                verbose=0,
+            )
+
             preds_scaled = model.predict(X_lstm_val).flatten()
             preds = self.target_scaler.inverse_transform(preds_scaled.reshape(-1, 1)).flatten()
             y_val_inv = self.target_scaler.inverse_transform(y_lstm_val.reshape(-1, 1)).flatten()
             mse = mean_squared_error(y_val_inv, preds)
             return mse
-        
+
         study = optuna.create_study(direction='minimize')
         study.optimize(objective, n_trials=100)
         self.best_lstm_params = study.best_params
@@ -709,7 +720,7 @@ class UltimateBitcoinForecaster:
     def train_xgboost(self, X_train, y_train):
         """Train XGBoost model with selected features."""
         if self.best_xgb_params is None:
-            self.best_xgb_params = {'max_depth': 3, 'learning_rate': 0.01, 'n_estimators': 100, 'subsample': 0.8, 'random_state': random_state}
+            self.best_xgb_params = {'max_depth': 3, 'learning_rate': 0.01, 'n_estimators': 100, 'subsample': 0.8, 'random_state': random_state, 'tree_method': 'hist', 'n_jobs': -1}
         self.xgb_model = xgb.XGBRegressor(**self.best_xgb_params)
         self.xgb_model.fit(X_train, y_train)
         logging.info("XGBoost model trained.")
